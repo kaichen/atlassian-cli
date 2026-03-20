@@ -54,11 +54,11 @@ function ensureSinglePage(data: unknown): JsonObject {
     throw new CliError("Unable to resolve a single Confluence page from the response.");
   }
   if (results.length === 0) {
-    throw new CliError("No page matched the provided query for --body-markdown.");
+    throw new CliError("No page matched the provided query for --markdown.");
   }
   if (results.length > 1) {
     throw new CliError(
-      `Expected exactly one page for --body-markdown, but found ${results.length}. Use --id or narrow the title/space.`,
+      `Expected exactly one page for --markdown, but found ${results.length}. Use --id or narrow the title/space.`,
     );
   }
   const first = asObject(results[0]);
@@ -233,6 +233,24 @@ function cleanupMarkdown(markdown: string): string {
   );
 }
 
+function stringifyFrontmatterValue(value: unknown): string {
+  if (value === undefined || value === null) {
+    return "\"\"";
+  }
+  return JSON.stringify(String(value));
+}
+
+function buildFrontmatter(page: JsonObject): string {
+  const fields = [
+    ["id", page.id],
+    ["type", page.type],
+    ["title", page.title],
+    ["status", page.status],
+  ];
+  const lines = fields.map(([key, value]) => `${key}: ${stringifyFrontmatterValue(value)}`);
+  return ["---", ...lines, "---"].join("\n");
+}
+
 export function ensureBodyStorageExpand(expand?: string): string {
   if (!expand) {
     return "body.storage";
@@ -247,11 +265,12 @@ export function ensureBodyStorageExpand(expand?: string): string {
   return fields.join(",");
 }
 
-export function getPageBodyMarkdown(data: unknown): string {
+export function getPageMarkdown(data: unknown): string {
   const page = ensureSinglePage(data);
   const storage = extractStorageValue(page);
   const normalizedHtml = normalizeConfluenceFragment(storage);
   const extracted = extractTables(normalizedHtml);
   const markdown = turndown.turndown(extracted.content);
-  return cleanupMarkdown(restoreTables(markdown, extracted.tables));
+  const body = cleanupMarkdown(restoreTables(markdown, extracted.tables));
+  return `${buildFrontmatter(page)}\n\n${body}`;
 }
