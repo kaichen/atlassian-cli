@@ -7,8 +7,12 @@ import {
   type CliOverrides,
   type GlobalOptions,
 } from "./core/config.ts";
+import {
+  ensureBodyStorageExpand,
+  getPageBodyMarkdown,
+} from "./core/confluence-markdown.ts";
 import { parseJsonInput } from "./core/json.ts";
-import { printJson, printKeyValue, printTable } from "./core/output.ts";
+import { printJson, printKeyValue, printTable, printText } from "./core/output.ts";
 import { AuthError, CliError, ConfigError, HttpError } from "./core/errors.ts";
 import { JiraService } from "./services/jira.ts";
 import { ConfluenceService } from "./services/confluence.ts";
@@ -728,14 +732,28 @@ export async function main(): Promise<void> {
     .option("--title <title>", "Page title")
     .option("--space <key>", "Space key")
     .option("--expand <expand>", "Fields to expand")
+    .option(
+      "--body-markdown",
+      "Fetch body.storage.value and return it as Markdown",
+    )
     .action(async (options, command) => {
       const ctx = createContext(command, "confluence");
+      if (options.bodyMarkdown && ctx.output === "json") {
+        throw new ConfigError("--body-markdown cannot be combined with --json.");
+      }
+      const expand = options.bodyMarkdown
+        ? ensureBodyStorageExpand(options.expand)
+        : options.expand;
       const data = await ctx.confluence!.getPage(
         options.id,
         options.title,
         options.space,
-        options.expand,
+        expand,
       );
+      if (options.bodyMarkdown) {
+        printText(getPageBodyMarkdown(data));
+        return;
+      }
       outputResult(ctx, data);
     })
 

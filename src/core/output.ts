@@ -11,6 +11,10 @@ export function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
+export function printText(value: string): void {
+  process.stdout.write(`${value}\n`);
+}
+
 export function printTable(headers: string[], rows: Cell[][]): void {
   const widths = headers.map((header, index) => {
     const cells = rows.map((row) => toCell(row[index]));
