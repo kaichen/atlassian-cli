@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const ENV_LINE = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/;
 
@@ -31,4 +32,12 @@ export function loadEnvFile(path: string, override = true): void {
     }
     process.env[key] = value;
   }
+}
+
+export function loadDefaultEnvFile(cwd = process.cwd()): void {
+  const path = resolve(cwd, ".env");
+  if (!existsSync(path)) {
+    return;
+  }
+  loadEnvFile(path, false);
 }

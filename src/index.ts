@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { loadEnvFile } from "./core/env.ts";
+import { loadDefaultEnvFile, loadEnvFile } from "./core/env.ts";
 import {
   resolveConfluenceConfig,
   resolveGlobalOptions,
@@ -23,6 +23,7 @@ interface CommandContext {
 }
 
 function loadEnvFromArgs(argv: string[]): void {
+  loadDefaultEnvFile();
   const envIndex = argv.indexOf("--env-file");
   const shortIndex = argv.indexOf("-e");
   const index = envIndex >= 0 ? envIndex : shortIndex;
@@ -186,7 +187,7 @@ export async function main(): Promise<void> {
   program
     .name("atlassian")
     .description("Atlassian CLI for Jira and Confluence")
-    .option("-e, --env-file <path>", "Path to .env file")
+    .option("-e, --env-file <path>", "Path to .env file (overrides default .env loading)")
     .option("--json", "Output raw JSON")
     .option("--verbose", "Verbose logging")
     .option("--read-only", "Disable write operations")
