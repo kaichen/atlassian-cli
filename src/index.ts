@@ -16,6 +16,7 @@ import { printJson, printKeyValue, printTable, printText } from "./core/output.t
 import { AuthError, CliError, ConfigError, HttpError } from "./core/errors.ts";
 import { JiraService } from "./services/jira.ts";
 import { ConfluenceService } from "./services/confluence.ts";
+import { startMcpServer } from "./mcp/server.ts";
 
 type OutputMode = "json" | "table";
 
@@ -207,6 +208,17 @@ export async function main(): Promise<void> {
     .option("--confluence-pat <token>", "Confluence personal access token (Server/DC)")
     .option("--confluence-ssl-verify <bool>", "Verify Confluence SSL certificates (true/false)")
     .option("--confluence-spaces-filter <keys>", "Comma-separated Confluence space keys");
+
+  program
+    .command("mcp")
+    .description("Run Atlassian MCP server over stdio")
+    .option("--enabled-tools <names>", "Comma-separated MCP tool names to enable")
+    .action(async (options, command) => {
+      await startMcpServer({
+        overrides: collectOverrides(command),
+        enabledTools: options.enabledTools,
+      });
+    });
 
   const jira = program.command("jira").description("Jira operations");
   const jiraIssue = jira.command("issue").description("Issue operations");

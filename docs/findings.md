@@ -51,6 +51,8 @@
 - Confluence search uses CQL via `confluence.cql` and can apply `CONFLUENCE_SPACES_FILTER`; user search hits `GET /rest/api/search/user`.
 - Confluence analytics uses `/wiki/rest/api/analytics/content/{page_id}/views` (Cloud-only).
 - mcp-atlassian config supports optional proxies (`HTTP_PROXY`, `HTTPS_PROXY`, `SOCKS_PROXY`, service-specific overrides) and custom headers via `JIRA_CUSTOM_HEADERS`/`CONFLUENCE_CUSTOM_HEADERS` (comma-separated `key=value`).
+- MCP TypeScript SDK stdio server uses `McpServer` + `StdioServerTransport`; local process-spawned integrations should communicate only over stdin/stdout JSON-RPC.
+- Local `tmp/mcp-atlassian` reference exposes canonical tool names such as `jira_get_issue`, `jira_search`, `confluence_search`, and `confluence_get_page`; reusing those names preserves compatibility for existing MCP clients.
 
 ## Technical Decisions
 <!-- 

@@ -63,6 +63,28 @@ atlassian --json jira issue search --jql "assignee = currentUser()"
 
 Run `atlassian --help` for full command list.
 
+## MCP Stdio Mode
+
+Run the CLI as an MCP server over stdio with a single top-level subcommand:
+
+```bash
+atlassian mcp
+```
+
+Limit the exposed tools if needed:
+
+```bash
+atlassian mcp --enabled-tools "jira_get_issue,jira_search,confluence_search"
+```
+
+You can also use environment variables:
+
+```bash
+export ENABLED_TOOLS="jira_get_issue,jira_search"
+export READ_ONLY_MODE=true
+atlassian mcp
+```
+
 ## Development
 
 Requires [Bun](https://bun.sh).
