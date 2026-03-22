@@ -12,6 +12,7 @@ import {
   ensureBodyStorageExpand,
   getPageMarkdown,
 } from "./core/confluence-markdown.ts";
+import { adfToMarkdown } from "./core/adf-markdown.ts";
 import { parseJsonInput } from "./core/json.ts";
 import { printJson, printKeyValue, printTable, printText } from "./core/output.ts";
 import { AuthError, CliError, ConfigError, HttpError } from "./core/errors.ts";
@@ -145,6 +146,77 @@ function getIssueSummary(issue: any, baseUrl: string): Record<string, unknown> {
   };
 }
 
+function getIssueMarkdown(issue: any, baseUrl: string, childIssues: any[] = []): string {
+  const fields = issue?.fields ?? {};
+  const key = issue?.key ?? "";
+  const lines: string[] = [];
+
+  lines.push(`# ${key}: ${fields.summary ?? ""}`);
+  lines.push("");
+
+  const parent = fields.parent;
+  if (parent?.key) {
+    const parentUrl = `${baseUrl}/browse/${parent.key}`;
+    const parentTitle = parent.fields?.summary ?? "";
+    lines.push(`Parent: [${parent.key} ${parentTitle}](${parentUrl})`);
+    lines.push("");
+  }
+
+  const meta: [string, string][] = [
+    ["Status", fields.status?.name],
+    ["Type", fields.issuetype?.name],
+    ["Priority", fields.priority?.name],
+    ["Assignee", fields.assignee?.displayName],
+    ["Reporter", fields.reporter?.displayName],
+    ["Labels", (fields.labels ?? []).join(", ")],
+    ["Components", (fields.components ?? []).map((c: any) => c.name).join(", ")],
+    ["Fix Versions", (fields.fixVersions ?? []).map((v: any) => v.name).join(", ")],
+    ["Resolution", fields.resolution?.name],
+    ["Created", fields.created?.slice(0, 10)],
+    ["Updated", fields.updated?.slice(0, 10)],
+    ["URL", key ? `${baseUrl}/browse/${key}` : ""],
+  ];
+  for (const [label, value] of meta) {
+    if (value) lines.push(`- **${label}**: ${value}`);
+  }
+
+  const attachments: { filename: string; content: string }[] =
+    (fields.attachment ?? []).map((a: any) => ({ filename: a.filename, content: a.content }));
+
+  // Merge subtasks (sub-task type) and childIssues (Epic children via JQL), deduplicated by key
+  const seenKeys = new Set<string>();
+  const allChildren: any[] = [];
+  for (const s of [...(fields.subtasks ?? []), ...childIssues]) {
+    if (!seenKeys.has(s.key)) { seenKeys.add(s.key); allChildren.push(s); }
+  }
+  if (allChildren.length > 0) {
+    lines.push("", "## Sub-issues");
+    for (const s of allChildren) {
+      const sUrl = `${baseUrl}/browse/${s.key}`;
+      const sTitle = s.fields?.summary ?? "";
+      const sStatus = s.fields?.status?.name ?? "";
+      lines.push(`- [${s.key} ${sTitle}](${sUrl}) — ${sStatus}`);
+    }
+  }
+
+  const desc = fields.description;
+  if (desc) {
+    lines.push("", "## Description", "", adfToMarkdown(desc, attachments));
+  }
+
+  const comments = fields.comment?.comments ?? [];
+  if (comments.length > 0) {
+    lines.push("", "## Comments");
+    for (const c of comments) {
+      const author = c.author?.displayName ?? "Unknown";
+      const date = (c.created ?? "").slice(0, 10);
+      lines.push("", `### ${author} (${date})`, "", adfToMarkdown(c.body));
+    }
+  }
+
+  return lines.join("\n");
+}
+
 function printIssueTable(issues: any[], baseUrl: string): void {
   const rows = issues.map((issue) => {
     const summary = getIssueSummary(issue, baseUrl);
@@ -247,9 +319,21 @@ export async function main(): Promise<void> {
     .action(async (issueKey: string, options, command) => {
       const ctx = createContext(command, "jira");
       const data = await ctx.jira!.getIssue(issueKey, options.fields, options.expand);
+      let childIssues: any[] = [];
+      if (ctx.output === "markdown") {
+        const res = await ctx.jira!.searchIssues(
+          `parent = ${issueKey}`,
+          "summary,status,issuetype",
+          100,
+          0,
+        ) as any;
+        childIssues = res?.issues ?? [];
+      }
       outputResult(ctx, data, { table: () => {
         const summary = getIssueSummary(data as any, ctx.jira!.getBaseUrl());
         printKeyValue("Issue", summary);
+      }, markdown: () => {
+        printText(getIssueMarkdown(data as any, ctx.jira!.getBaseUrl(), childIssues));
       } });
     })
 
