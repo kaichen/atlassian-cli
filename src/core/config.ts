@@ -2,10 +2,10 @@ import { ConfigError } from "./errors.ts";
 
 export type AuthType = "basic" | "pat";
 
-export type OutputMode = "table" | "json";
+export type OutputMode = "table" | "json" | "markdown";
 
 export interface GlobalOptions {
-  json: boolean;
+  format: OutputMode;
   verbose: boolean;
   readOnly: boolean;
 }
@@ -49,12 +49,33 @@ export interface CliOverrides {
   confluenceSpacesFilter?: string;
   readOnly?: boolean;
   json?: boolean;
+  format?: string;
+  markdown?: boolean;
   verbose?: boolean;
+}
+
+export function resolveOutputMode(overrides: CliOverrides): OutputMode {
+  if (overrides.format) {
+    if (overrides.json || overrides.markdown) {
+      throw new ConfigError("Use --format or --json/--markdown, not both.");
+    }
+    const f = overrides.format.toLowerCase();
+    if (f === "json" || f === "table" || f === "markdown") {
+      return f;
+    }
+    throw new ConfigError(`Invalid --format value "${overrides.format}". Use table, json, or markdown.`);
+  }
+  if (overrides.json && overrides.markdown) {
+    throw new ConfigError("Cannot combine --json and --markdown. Use one or use --format.");
+  }
+  if (overrides.markdown) return "markdown";
+  if (overrides.json) return "json";
+  return "table";
 }
 
 export function resolveGlobalOptions(overrides: CliOverrides): GlobalOptions {
   return {
-    json: Boolean(overrides.json),
+    format: resolveOutputMode(overrides),
     verbose: overrides.verbose ?? parseBool(process.env.MCP_VERBOSE, false),
     readOnly: overrides.readOnly ?? parseBool(process.env.READ_ONLY_MODE, false),
   };
@@ -84,6 +105,19 @@ export function isCloudUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function normalizeConfluenceBaseUrl(url: string): string {
+  const normalizedUrl = normalizeUrl(url);
+  if (!isCloudUrl(normalizedUrl)) {
+    return normalizedUrl;
+  }
+  const parsed = new URL(normalizedUrl);
+  if (parsed.pathname === "" || parsed.pathname === "/") {
+    parsed.pathname = "/wiki";
+    return normalizeUrl(parsed.toString());
+  }
+  return normalizedUrl;
 }
 
 function parseCustomHeaders(raw: string | undefined): Record<string, string> | undefined {
@@ -173,7 +207,7 @@ export function resolveConfluenceConfig(
     }
     return undefined;
   }
-  const normalizedUrl = normalizeUrl(url);
+  const normalizedUrl = normalizeConfluenceBaseUrl(url);
   const isCloud = isCloudUrl(normalizedUrl);
   const username = overrides.confluenceUsername ?? process.env.CONFLUENCE_USERNAME;
   const apiToken = overrides.confluenceToken ?? process.env.CONFLUENCE_API_TOKEN;

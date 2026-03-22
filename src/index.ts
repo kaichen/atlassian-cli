@@ -6,6 +6,7 @@ import {
   resolveJiraConfig,
   type CliOverrides,
   type GlobalOptions,
+  type OutputMode,
 } from "./core/config.ts";
 import {
   ensureBodyStorageExpand,
@@ -17,8 +18,6 @@ import { AuthError, CliError, ConfigError, HttpError } from "./core/errors.ts";
 import { JiraService } from "./services/jira.ts";
 import { ConfluenceService } from "./services/confluence.ts";
 import { startMcpServer } from "./mcp/server.ts";
-
-type OutputMode = "json" | "table";
 
 interface CommandContext {
   globals: GlobalOptions;
@@ -69,7 +68,9 @@ function collectOverrides(command: Command): CliOverrides {
     confluenceSslVerify: parseOptionalBool(opts.confluenceSslVerify),
     confluenceSpacesFilter: opts.confluenceSpacesFilter,
     readOnly: opts.readOnly,
+    format: opts.format,
     json: opts.json,
+    markdown: opts.markdown,
     verbose: opts.verbose,
   };
 }
@@ -77,19 +78,18 @@ function collectOverrides(command: Command): CliOverrides {
 function createContext(command: Command, service: "jira" | "confluence"): CommandContext {
   const overrides = collectOverrides(command);
   const globals = resolveGlobalOptions(overrides);
-  const output: OutputMode = overrides.json ? "json" : "table";
   if (service === "jira") {
     const jiraConfig = resolveJiraConfig(overrides, true);
     return {
       globals,
-      output,
+      output: globals.format,
       jira: jiraConfig ? new JiraService(jiraConfig, globals) : undefined,
     };
   }
   const confluenceConfig = resolveConfluenceConfig(overrides, true);
   return {
     globals,
-    output,
+    output: globals.format,
     confluence: confluenceConfig
       ? new ConfluenceService(confluenceConfig, globals)
       : undefined,
@@ -102,17 +102,31 @@ function ensureWriteAllowed(globals: GlobalOptions): void {
   }
 }
 
+interface Formatters {
+  table?: () => void;
+  markdown?: () => void;
+}
+
 function outputResult(
   ctx: CommandContext,
   data: unknown,
-  format?: () => void,
+  formatters?: Formatters,
 ): void {
   if (ctx.output === "json") {
     printJson(data);
     return;
   }
-  if (format) {
-    format();
+  if (ctx.output === "markdown" && formatters?.markdown) {
+    formatters.markdown();
+    return;
+  }
+  if (ctx.output === "markdown" && !formatters?.markdown) {
+    if (ctx.globals.verbose) {
+      process.stderr.write("[warn] --format markdown not supported for this command, using table\n");
+    }
+  }
+  if (formatters?.table) {
+    formatters.table();
     return;
   }
   printJson(data);
@@ -193,7 +207,9 @@ export async function main(): Promise<void> {
     .name("atlassian")
     .description("Atlassian CLI for Jira and Confluence")
     .option("-e, --env-file <path>", "Path to .env file (overrides default .env loading)")
-    .option("--json", "Output raw JSON")
+    .option("--format <format>", "Output format: table, json, or markdown")
+    .option("--json", "Output raw JSON (shorthand for --format json)")
+    .option("--markdown", "Output as Markdown (shorthand for --format markdown)")
     .option("--verbose", "Verbose logging")
     .option("--read-only", "Disable write operations")
     .option("--jira-url <url>", "Jira URL")
@@ -231,10 +247,10 @@ export async function main(): Promise<void> {
     .action(async (issueKey: string, options, command) => {
       const ctx = createContext(command, "jira");
       const data = await ctx.jira!.getIssue(issueKey, options.fields, options.expand);
-      outputResult(ctx, data, () => {
+      outputResult(ctx, data, { table: () => {
         const summary = getIssueSummary(data as any, ctx.jira!.getBaseUrl());
         printKeyValue("Issue", summary);
-      });
+      } });
     })
 
   jiraIssue
@@ -255,10 +271,10 @@ export async function main(): Promise<void> {
         options.expand,
         options.projectsFilter,
       );
-      outputResult(ctx, data, () => {
+      outputResult(ctx, data, { table: () => {
         const issues = data?.issues ?? [];
         printIssueTable(issues, ctx.jira!.getBaseUrl());
-      });
+      } });
     })
 
   jiraIssue
@@ -299,9 +315,9 @@ export async function main(): Promise<void> {
       const ctx = createContext(command, "jira");
       ensureWriteAllowed(ctx.globals);
       await ctx.jira!.deleteIssue(issueKey);
-      outputResult(ctx, { success: true, issueKey }, () => {
+      outputResult(ctx, { success: true, issueKey }, { table: () => {
         printKeyValue("Deleted", { issue: issueKey });
-      });
+      } });
     })
 
   jiraIssue
@@ -434,10 +450,10 @@ export async function main(): Promise<void> {
       const ctx = createContext(command, "jira");
       const ids = options.ids.split(",").map((value: string) => value.trim());
       const data = await ctx.jira!.downloadAttachments(ids, options.dir);
-      outputResult(ctx, data, () => {
+      outputResult(ctx, data, { table: () => {
         const rows = data.map((item) => [item.id, item.filename, item.filePath]);
         printTable(["ID", "Filename", "Path"], rows);
-      });
+      } });
     })
 
   jiraIssue
@@ -468,7 +484,7 @@ export async function main(): Promise<void> {
         Number(options.start),
         Number(options.limit),
       );
-      outputResult(ctx, data, () => {
+      outputResult(ctx, data, { table: () => {
         const values = data?.values ?? data;
         const rows = (values ?? []).map((project: any) => [
           project.key ?? "",
@@ -476,7 +492,7 @@ export async function main(): Promise<void> {
           project.projectTypeKey ?? "",
         ]);
         printTable(["Key", "Name", "Type"], rows);
-      });
+      } });
     })
 
   const jiraProject = jira
@@ -750,10 +766,11 @@ export async function main(): Promise<void> {
     )
     .action(async (options, command) => {
       const ctx = createContext(command, "confluence");
-      if (options.markdown && ctx.output === "json") {
+      const wantsMarkdownDocument = options.markdown || ctx.output === "markdown";
+      if (wantsMarkdownDocument && ctx.output === "json") {
         throw new ConfigError("--markdown cannot be combined with --json.");
       }
-      const expand = options.markdown
+      const expand = wantsMarkdownDocument
         ? ensureBodyStorageExpand(options.expand)
         : options.expand;
       const data = await ctx.confluence!.getPage(
@@ -762,7 +779,7 @@ export async function main(): Promise<void> {
         options.space,
         expand,
       );
-      if (options.markdown) {
+      if (wantsMarkdownDocument) {
         printText(getPageMarkdown(data));
         return;
       }
