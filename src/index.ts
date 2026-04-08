@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { loadDefaultEnvFile, loadEnvFile } from "./core/env.ts";
+import { normalizeConfluencePageId, normalizeJiraIssueKey } from "./core/atlassian-url.ts";
 import {
   resolveConfluenceConfig,
   resolveGlobalOptions,
@@ -313,16 +314,17 @@ export async function main(): Promise<void> {
 
   jiraIssue
     .command("view")
-    .argument("<issueKey>", "Issue key (e.g., PROJ-123)")
+    .argument("<issueKey>", "Issue key or browse URL (e.g., PROJ-123)")
     .option("--fields <fields>", "Comma-separated fields")
     .option("--expand <expand>", "Fields to expand")
     .action(async (issueKey: string, options, command) => {
       const ctx = createContext(command, "jira");
-      const data = await ctx.jira!.getIssue(issueKey, options.fields, options.expand);
+      const normalizedIssueKey = normalizeJiraIssueKey(issueKey);
+      const data = await ctx.jira!.getIssue(normalizedIssueKey, options.fields, options.expand);
       let childIssues: any[] = [];
       if (ctx.output === "markdown") {
         const res = await ctx.jira!.searchIssues(
-          `parent = ${issueKey}`,
+          `parent = ${normalizedIssueKey}`,
           "summary,status,issuetype",
           100,
           0,
@@ -840,7 +842,7 @@ export async function main(): Promise<void> {
 
   confluencePage
     .command("get")
-    .option("--id <id>", "Page ID")
+    .option("--id <id>", "Page ID or page URL")
     .option("--title <title>", "Page title")
     .option("--space <key>", "Space key")
     .option("--expand <expand>", "Fields to expand")
@@ -857,8 +859,9 @@ export async function main(): Promise<void> {
       const expand = wantsMarkdownDocument
         ? ensureBodyStorageExpand(options.expand)
         : options.expand;
+      const pageId = options.id ? normalizeConfluencePageId(options.id) : undefined;
       const data = await ctx.confluence!.getPage(
-        options.id,
+        pageId,
         options.title,
         options.space,
         expand,

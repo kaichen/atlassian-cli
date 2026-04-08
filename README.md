@@ -51,9 +51,15 @@ atlassian-cli -e .env jira issue search --jql "project = PROJ"
 ```bash
 atlassian-cli jira issue search --jql "project = PROJ AND status = 'In Progress'"
 atlassian-cli jira issue view PROJ-123
+atlassian-cli jira issue view "https://your-company.atlassian.net/browse/PROJ-123"
 atlassian-cli confluence page search "onboarding docs"
 atlassian-cli confluence page get --id 123456
+atlassian-cli confluence page get --id "https://your-company.atlassian.net/wiki/spaces/TEAM/pages/123456/Example"
 ```
+
+`jira issue view` accepts either a Jira issue key or a Jira browse URL. The CLI extracts the issue key from URLs such as `https://your-company.atlassian.net/browse/PROJ-123`.
+
+`confluence page get --id` accepts either a numeric page ID or a Confluence page URL. The CLI extracts the page ID from URLs such as `https://your-company.atlassian.net/wiki/spaces/TEAM/pages/123456/Example` or `https://your-company.atlassian.net/wiki/pages/viewpage.action?pageId=123456`.
 
 Use `--json` for raw JSON output:
 
