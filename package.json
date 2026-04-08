@@ -4,7 +4,7 @@
   "description": "CLI for Atlassian Jira and Confluence",
   "type": "module",
   "bin": {
-    "atlassian": "dist/index.js"
+    "atlassian-cli": "dist/index.js"
   },
   "files": [
     "dist"

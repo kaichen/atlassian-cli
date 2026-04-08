@@ -43,38 +43,38 @@ export CONFLUENCE_PERSONAL_TOKEN=your_pat
 Or pass a `.env` file with the `-e` flag:
 
 ```bash
-atlassian -e .env jira issue search --jql "project = PROJ"
+atlassian-cli -e .env jira issue search --jql "project = PROJ"
 ```
 
 ## Usage
 
 ```bash
-atlassian jira issue search --jql "project = PROJ AND status = 'In Progress'"
-atlassian jira issue get --key PROJ-123
-atlassian confluence page search "onboarding docs"
-atlassian confluence page get --id 123456
+atlassian-cli jira issue search --jql "project = PROJ AND status = 'In Progress'"
+atlassian-cli jira issue view PROJ-123
+atlassian-cli confluence page search "onboarding docs"
+atlassian-cli confluence page get --id 123456
 ```
 
 Use `--json` for raw JSON output:
 
 ```bash
-atlassian --json jira issue search --jql "assignee = currentUser()"
+atlassian-cli --json jira issue search --jql "assignee = currentUser()"
 ```
 
-Run `atlassian --help` for full command list.
+Run `atlassian-cli --help` for full command list.
 
 ## MCP Stdio Mode
 
 Run the CLI as an MCP server over stdio with a single top-level subcommand:
 
 ```bash
-atlassian mcp
+atlassian-cli mcp
 ```
 
 Limit the exposed tools if needed:
 
 ```bash
-atlassian mcp --enabled-tools "jira_get_issue,jira_search,confluence_search"
+atlassian-cli mcp --enabled-tools "jira_get_issue,jira_search,confluence_search"
 ```
 
 You can also use environment variables:
@@ -82,7 +82,7 @@ You can also use environment variables:
 ```bash
 export ENABLED_TOOLS="jira_get_issue,jira_search"
 export READ_ONLY_MODE=true
-atlassian mcp
+atlassian-cli mcp
 ```
 
 ## Development

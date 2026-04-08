@@ -276,7 +276,7 @@ export async function main(): Promise<void> {
   loadEnvFromArgs(process.argv);
   const program = new Command();
   program
-    .name("atlassian")
+    .name("atlassian-cli")
     .description("Atlassian CLI for Jira and Confluence")
     .option("-e, --env-file <path>", "Path to .env file (overrides default .env loading)")
     .option("--format <format>", "Output format: table, json, or markdown")
