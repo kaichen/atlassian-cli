@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import packageJson from "../package.json" with { type: "json" };
 import { loadDefaultEnvFile, loadEnvFile } from "./core/env.ts";
 import { normalizeConfluencePageId, normalizeJiraIssueKey } from "./core/atlassian-url.ts";
 import {
@@ -278,6 +279,7 @@ export async function main(): Promise<void> {
   const program = new Command();
   program
     .name("atlassian-cli")
+    .version(packageJson.version)
     .description("Atlassian CLI for Jira and Confluence")
     .option("-e, --env-file <path>", "Path to .env file (overrides default .env loading)")
     .option("--format <format>", "Output format: table, json, or markdown")
